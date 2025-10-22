@@ -21,6 +21,12 @@ export type FlowDefinition = {
 export interface FlowService {
   key: string
   label: string
+  meta?: {
+    description?: string
+    inputs?: string[]
+    outputs?: string[]
+    example?: any
+  }
 
   onCreate?(args: { flowId: string; node: FlowNode }): Promise<void> | void
   onSave?(args: { flowId: string; node: FlowNode }): Promise<void> | void

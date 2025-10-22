@@ -31,6 +31,12 @@ function compare(op: Rule['when']['op'], a: any, b: any) {
 export const DecisionService: FlowService = {
 	 key: 'decision',
 	 label: 'Decision',
+  meta: {
+    description: 'Avaliador condicional com regras simples que define o próximo nó.',
+    inputs: ['Objeto de contexto (input/última saída ou bag)'],
+    outputs: ['{ matched: Rule | null }'],
+    example: { rules: [{ when: { path: 'status', op: 'eq', value: 200 }, next: 'node-2' }], defaultNext: null },
+  },
 
 	 async onRun({ node, input, context }) {
 		 const cfg = (node.config ?? {}) as DecisionConfig

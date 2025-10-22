@@ -3,6 +3,12 @@ import { FlowNode, FlowService } from './types'
 export const WebhookService: FlowService = {
   key: 'webhook',
   label: 'Webhook',
+  meta: {
+    description: 'Chama uma URL externa (GET/POST/PUT/PATCH) e retorna status e payload.',
+    inputs: ['Qualquer JSON (opcional)'],
+    outputs: ['{ status: number, data: any }'],
+    example: { url: 'https://httpbin.org/post', method: 'POST', body: { foo: 'bar' } },
+  },
 
   async onCreate({ node }) {
     if (!node.config) node.config = {}

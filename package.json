@@ -11,11 +11,16 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e:demo": "tsx scripts/e2e-demo.ts"
+    "e2e:demo": "tsx scripts/e2e-demo.ts",
+    "e2e:branch2": "tsx scripts/e2e-branch-two-forms.ts",
+    "cli:add-service": "tsx scripts/add-service.ts",
+    "e2e:workspace": "tsx scripts/e2e-workspace-flow.ts"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.0",
     "@prisma/client": "^6.17.1",
     "next": "16.0.0",
+    "next-auth": "^4.24.11",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "reactflow": "^11.11.4",
