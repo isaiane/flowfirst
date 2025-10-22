@@ -39,7 +39,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
         throw new Error(`Serviço '${node.type}' não registrado`)
       }
 
-      const { output } = await service.onRun({
+      const { output, next } = await service.onRun({
         node,
         input: lastOutput,
         context: ctx,
@@ -48,7 +48,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
       ctx.bag[node.id] = output
       lastOutput = output
 
-      currentId = node.next ?? null
+      currentId = (next ?? node.next) ?? null
     }
 
     await prisma.flowExecution.update({

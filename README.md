@@ -27,3 +27,32 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public"
 2. Crie um projeto na Vercel e importe o repo.
 3. Adicione `DATABASE_URL` como variável de ambiente (Production/Preview).
 4. Rode `npx prisma migrate deploy` no primeiro deploy (Command ou script). Alternativamente, faça um deploy local das migrações e confirme que o banco está pronto.
+
+---
+
+# Fase 2 — Flow Builder (ReactFlow)
+
+## Novas dependências
+`npm i reactflow zustand`
+
+## Builder
+- Página: `/flow-builder`
+- Sidebar com nodes: Webhook, Decision, Form
+- Inspector para editar config do node selecionado
+- Salvar → `PUT /api/flows/:id` (grava `definition` no Postgres)
+- Executar → `POST /api/execute/:flowId`
+
+### APIs adicionadas/atualizadas
+- `GET /api/flows/:id` → retorna `{ flow: { id, name, definition } }`
+- `PUT /api/flows/:id` body: `{ name, definition }`
+- `POST /api/flows` com `{ kind: "blank" }` para criar um fluxo vazio
+
+### Serviços
+- `webhook` (funcional)
+- `decision` (branching com regras simples; escolhe próximo node via retorno `next`)
+- `form` (stub, apenas propaga config nesta fase)
+
+## Testes
+- Unit (Vitest): `npm run test`
+- E2E demo: `npm run e2e:demo` (cria e executa fluxo webhook)
+- E2E decision (opcional): `npm run e2e:decision` (requer dev server ativo)

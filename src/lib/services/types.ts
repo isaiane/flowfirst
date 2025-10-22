@@ -7,6 +7,8 @@ export type RunContext = {
 export type FlowNode = {
   id: string
   type: string
+  label?: string
+  position?: { x: number; y: number }
   config?: Record<string, unknown>
   next?: string | null
 }
@@ -28,7 +30,7 @@ export interface FlowService {
     node: FlowNode
     input: unknown
     context: RunContext
-  }): Promise<{ output: unknown }>
+  }): Promise<{ output: unknown; next?: string | null }>
 }
 
 export type ServiceRegistry = Record<string, FlowService>
