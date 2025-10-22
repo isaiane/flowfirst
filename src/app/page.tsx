@@ -47,7 +47,7 @@ export default function Home() {
       {flowId && <p>Flow criado: <code>{flowId}</code></p>}
 
       {output && (
-        <pre className="p-4 bg-gray-100 rounded overflow-auto">
+        <pre className="p-4 bg-gray-100 text-black rounded overflow-auto">
           {JSON.stringify(output, null, 2)}
         </pre>
       )}

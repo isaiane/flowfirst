@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { FlowDefinition } from '@/lib/services/types'
 
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   }
 
   const flow = await prisma.flow.create({
-    data: { name: 'Demo Webhook', definition: JSON.stringify(def) as any },
+    data: { name: 'Demo Webhook', definition: def as Prisma.InputJsonValue },
     select: { id: true, name: true },
   })
 

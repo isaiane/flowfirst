@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import type { Prisma } from '@prisma/client'
 import { FlowDefinition, FlowNode, RunContext } from '@/lib/services/types'
 import { services } from '@/lib/services'
 
@@ -21,7 +22,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
     bag: {},
   }
 
-  let currentId = definition.start
+  let currentId: string | null = definition.start
   let lastOutput: unknown = input ?? {}
 
   try {
@@ -52,7 +53,10 @@ export async function executeFlow(flowId: string, input?: unknown) {
 
     await prisma.flowExecution.update({
       where: { id: execution.id },
-      data: { status: 'SUCCESS', result: { bag: ctx.bag, lastOutput } },
+      data: {
+        status: 'SUCCESS',
+        result: { bag: ctx.bag, lastOutput } as Prisma.InputJsonValue,
+      },
     })
 
     await log(execution.id, 'INFO', 'Fluxo finalizado com sucesso', {
@@ -82,7 +86,7 @@ async function log(
   data?: unknown,
 ) {
   await prisma.flowLog.create({
-    data: { executionId, level, message, data },
+    data: { executionId, level, message, data: data as Prisma.InputJsonValue },
   })
 }
 
