@@ -1,0 +1,61 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Flow {
+  id          String   @id @default(cuid())
+  name        String
+  definition  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  executions  FlowExecution[]
+}
+
+model FlowExecution {
+  id          String     @id @default(cuid())
+  flowId      String
+  flow        Flow       @relation(fields: [flowId], references: [id])
+  status      ExecStatus @default(PENDING)
+  input       Json?
+  result      Json?
+  createdAt   DateTime   @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  logs        FlowLog[]
+}
+
+model FlowLog {
+  id           String        @id @default(cuid())
+  executionId  String
+  execution    FlowExecution @relation(fields: [executionId], references: [id])
+  level        LogLevel      @default(INFO)
+  message      String
+  data         Json?
+  timestamp    DateTime      @default(now())
+}
+
+enum ExecStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
