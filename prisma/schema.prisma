@@ -17,34 +17,40 @@ model Flow {
   id          String   @id @default(cuid())
   name        String
   definition  Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   executions  FlowExecution[]
+
+  @@map("flows")
 }
 
 model FlowExecution {
   id          String     @id @default(cuid())
-  flowId      String
+  flowId      String     @map("flow_id")
   flow        Flow       @relation(fields: [flowId], references: [id])
   status      ExecStatus @default(PENDING)
   input       Json?
   result      Json?
-  createdAt   DateTime   @default(now())
-  startedAt   DateTime?
-  finishedAt  DateTime?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  startedAt   DateTime?  @map("started_at")
+  finishedAt  DateTime?  @map("finished_at")
 
   logs        FlowLog[]
+
+  @@map("flow_executions")
 }
 
 model FlowLog {
   id           String        @id @default(cuid())
-  executionId  String
+  executionId  String        @map("execution_id")
   execution    FlowExecution @relation(fields: [executionId], references: [id])
   level        LogLevel      @default(INFO)
   message      String
   data         Json?
   timestamp    DateTime      @default(now())
+
+  @@map("flow_logs")
 }
 
 enum ExecStatus {
