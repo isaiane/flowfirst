@@ -1,8 +1,16 @@
 ;(async () => {
 	 const base = process.env.E2E_BASE_URL || 'http://localhost:3000'
 
-	 // 1) Criar fluxo em branco
-	 const created = await fetchJson(base + '/api/flows', {
+	 // 0) Criar workspace (bypass)
+	 const ws = await fetchJson(base + '/api/spaces', {
+		 method: 'POST',
+		 headers: { 'Content-Type': 'application/json' },
+		 body: JSON.stringify({ name: 'E2E Branch' }),
+	 })
+	 const workspaceId = ws.workspace.id as string
+
+	 // 1) Criar fluxo em branco (namespaced)
+	 const created = await fetchJson(base + `/api/spaces/${workspaceId}/flows`, {
 		 method: 'POST',
 		 headers: { 'Content-Type': 'application/json' },
 		 body: JSON.stringify({ kind: 'blank' }),
@@ -19,23 +27,23 @@
 			 { id: 'f2', type: 'form', label: 'Form not-200', config: { fields: ['err'] }, next: null },
 		 ],
 	 }
-	 await fetchJson(base + `/api/flows/${flowId}`, {
+	 await fetchJson(base + `/api/spaces/${workspaceId}/flows/${flowId}`, {
 		 method: 'PUT',
 		 headers: { 'Content-Type': 'application/json' },
 		 body: JSON.stringify({ name: 'Branch 2 Forms', definition: def }),
 	 })
 
 	 // 3) Run A (200 -> f1)
-	 const runA = await fetchJson(base + `/api/execute/${flowId}`, { method: 'POST' })
+	 const runA = await fetchJson(base + `/api/spaces/${workspaceId}/execute/${flowId}`, { method: 'POST' })
 
 	 // 4) Ajustar webhook para 404 e rodar novamente (-> f2)
 	 def.nodes = def.nodes.map((n: any) => n.id === 'w1' ? { ...n, config: { url: 'https://httpbin.org/status/404', method: 'GET' } } : n)
-	 await fetchJson(base + `/api/flows/${flowId}`, {
+	 await fetchJson(base + `/api/spaces/${workspaceId}/flows/${flowId}`, {
 		 method: 'PUT',
 		 headers: { 'Content-Type': 'application/json' },
 		 body: JSON.stringify({ name: 'Branch 2 Forms', definition: def }),
 	 })
-	 const runB = await fetchJson(base + `/api/execute/${flowId}`, { method: 'POST' })
+	 const runB = await fetchJson(base + `/api/spaces/${workspaceId}/execute/${flowId}`, { method: 'POST' })
 
 	 const summary = {
 		 flowId,
@@ -43,7 +51,7 @@
 		 B: { ok: runB.ok, wentTo: runB.bag?.f1 ? 'f1' : (runB.bag?.f2 ? 'f2' : 'unknown') },
 	 }
 	 console.log(JSON.stringify(summary, null, 2))
-}
+ 
 
 async function fetchJson(url: string, init?: RequestInit) {
 	 const res = await fetch(url, init)

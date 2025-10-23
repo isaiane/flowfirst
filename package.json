@@ -17,10 +17,11 @@
     "e2e:workspace": "tsx scripts/e2e-workspace-flow.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.0",
+    "@next-auth/prisma-adapter": "^1",
     "@prisma/client": "^6.17.1",
     "next": "16.0.0",
     "next-auth": "^4.24.11",
+    "nodemailer": "^7.0.9",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "reactflow": "^11.11.4",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.23",
+    "@types/nodemailer": "^7.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

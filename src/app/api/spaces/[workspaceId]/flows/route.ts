@@ -39,4 +39,17 @@ export async function POST(req: NextRequest, ctx: Params) {
   return NextResponse.json({ flow })
 }
 
+export async function GET(_req: NextRequest, ctx: Params) {
+  const { workspaceId } = await ctx.params
+  const authz = await requireMembership(workspaceId)
+  if ('error' in authz) return authz.error
+
+  const flows = await prisma.flow.findMany({
+    where: { workspaceId },
+    select: { id: true, name: true, createdAt: true, updatedAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  return NextResponse.json({ flows })
+}
+
 

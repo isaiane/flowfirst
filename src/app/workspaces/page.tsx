@@ -17,7 +17,7 @@ export default function WorkspacesPage() {
     })
     const d = await r.json()
     if (d?.workspace?.id) {
-      window.location.href = `/space/${d.workspace.id}/flow-builder`
+      window.location.href = `/space/${d.workspace.id}/flows`
     }
   }
 
@@ -31,7 +31,7 @@ export default function WorkspacesPage() {
       <ul className="list-disc pl-5">
         {spaces.map(s => (
           <li key={s.id} className="mt-2">
-            <a className="underline" href={`/space/${s.id}/flow-builder`}>{s.name}</a>
+            <a className="underline" href={`/space/${s.id}/flows`}>{s.name}</a>
           </li>
         ))}
       </ul>

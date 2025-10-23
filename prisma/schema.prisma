@@ -90,8 +90,8 @@ model Membership {
 
 model Flow {
   id          String     @id @default(cuid())
-  workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
   name        String
   definition  Json
   createdAt   DateTime   @default(now()) @map("created_at")

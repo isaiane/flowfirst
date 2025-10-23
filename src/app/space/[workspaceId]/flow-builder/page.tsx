@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import ReactFlow, {
   Background,
   Controls,
@@ -75,8 +75,10 @@ function fromReactFlow(nodes: Node[], edges: Edge[], prev?: FlowDefinition): Flo
 
 export default function FlowBuilderPage() {
   const { workspaceId } = useParams() as { workspaceId: string }
+  const search = useSearchParams()
+  const initialFlowId = search.get('flowId') || ''
 
-  const [flowId, setFlowId] = useState<string>('')
+  const [flowId, setFlowId] = useState<string>(initialFlowId)
   const [name, setName] = useState<string>('Meu Fluxo')
   const [definition, setDefinition] = useState<FlowDefinition>({ start: 'node-1', nodes: [] })
 
@@ -87,35 +89,20 @@ export default function FlowBuilderPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
   useEffect(() => {
-    async function ensureFlow() {
-      const res = await fetch(`/api/spaces/${workspaceId}/flows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'blank' }),
-      })
-      const data = await res.json()
-      setFlowId(data.flow.id)
-
-      const def: FlowDefinition = {
-        start: 'node-1',
-        nodes: [
-          {
-            id: 'node-1',
-            type: 'webhook',
-            label: 'Webhook inicial',
-            position: { x: 100, y: 100 },
-            config: { url: 'https://httpbin.org/post', method: 'POST', body: { hello: 'flowfirst' } },
-            next: null,
-          },
-        ],
-      }
+    async function loadFlow() {
+      if (!initialFlowId) return
+      const r = await fetch(`/api/spaces/${workspaceId}/flows/${initialFlowId}`)
+      const d = await r.json()
+      setFlowId(d.flow.id)
+      const def = d.flow.definition as FlowDefinition
       setDefinition(def)
       const rf = toReactFlow(def)
       setNodes(rf.nodes)
       setEdges(rf.edges)
     }
-    void ensureFlow()
-  }, [setEdges, setNodes, workspaceId])
+    void loadFlow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFlowId, workspaceId])
 
   function onConnect(c: Connection) {
     setEdges(eds => addEdge({ ...c, id: `${c.source}-${c.target}` } as Edge, eds))
