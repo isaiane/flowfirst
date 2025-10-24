@@ -13,9 +13,16 @@ export type FlowNode = {
   next?: string | null
 }
 
+export type FlowEdge = {
+  from: string
+  to: string
+  via?: string | null
+}
+
 export type FlowDefinition = {
   start: string
   nodes: FlowNode[]
+  edges?: FlowEdge[]
 }
 
 export type WaitSignal = {
@@ -42,7 +49,12 @@ export interface FlowService {
     node: FlowNode
     input: unknown
     context: RunContext
-  }): Promise<{ output?: unknown; next?: string | null; wait?: WaitSignal }>
+  }): Promise<{
+    output?: unknown
+    route?: string | null
+    next?: string | null
+    wait?: WaitSignal
+  }>
 }
 
 export type ServiceRegistry = Record<string, FlowService>

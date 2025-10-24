@@ -15,6 +15,7 @@ import ReactFlow, {
   useNodesState,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { serviceSchemas } from '@/lib/services/schemas'
 
 type FlowNode = {
   id: string
@@ -25,9 +26,12 @@ type FlowNode = {
   next?: string | null
 }
 
+type FlowEdge = { from: string; to: string; via?: string | null }
+
 type FlowDefinition = {
   start: string
   nodes: FlowNode[]
+  edges?: FlowEdge[]
 }
 
 const servicePalette = [
@@ -47,16 +51,20 @@ function toReactFlow(def: FlowDefinition) {
     data: { label: `${n.label ?? n.type} (${n.id})`, _raw: n },
     type: 'default',
   }))
-  const edges: Edge[] = def.nodes
-    .filter(n => !!n.next)
-    .map(n => ({ id: `${n.id}->${n.next}`, source: n.id, target: String(n.next) }))
+  const edges: Edge[] = []
+  for (const e of (def.edges ?? [])) {
+    edges.push({ id: `${e.from}->${e.to}${e.via ? `:${e.via}` : ''}`, source: e.from, target: e.to, label: e.via ?? undefined })
+  }
+  for (const n of def.nodes) {
+    if (n.next && !(def.edges ?? []).some(e => e.from === n.id)) {
+      edges.push({ id: `${n.id}->${n.next}`, source: n.id, target: String(n.next), label: 'default' })
+    }
+  }
   return { nodes, edges }
 }
 
 function fromReactFlow(nodes: Node[], edges: Edge[], prev?: FlowDefinition): FlowDefinition {
-  const nextMap: Record<string, string | null> = {}
-  edges.forEach(e => { nextMap[e.source] = e.target })
-
+  const namedEdges: FlowEdge[] = edges.map(e => ({ from: e.source, to: e.target, via: (e.label as string | undefined) ?? 'default' }))
   const outNodes: FlowNode[] = nodes.map(n => {
     const raw: FlowNode = (n.data?._raw ?? {}) as any
     return {
@@ -65,12 +73,11 @@ function fromReactFlow(nodes: Node[], edges: Edge[], prev?: FlowDefinition): Flo
       label: raw.label ?? raw.type ?? 'node',
       position: n.position,
       config: raw.config ?? {},
-      next: nextMap[n.id] ?? raw.next ?? null,
+      next: raw.next ?? null,
     }
   })
-
   const start = prev?.start && outNodes.find(n => n.id === prev.start) ? prev.start : (outNodes[0]?.id ?? 'node-1')
-  return { start, nodes: outNodes }
+  return { start, nodes: outNodes, edges: namedEdges }
 }
 
 export default function FlowBuilderPage() {
@@ -80,13 +87,17 @@ export default function FlowBuilderPage() {
 
   const [flowId, setFlowId] = useState<string>(initialFlowId)
   const [name, setName] = useState<string>('Meu Fluxo')
-  const [definition, setDefinition] = useState<FlowDefinition>({ start: 'node-1', nodes: [] })
+  const [definition, setDefinition] = useState<FlowDefinition>({ start: 'node-1', nodes: [], edges: [] })
+  const [errors, setErrors] = useState<Record<string, string[]>>({})
+  const [copilotOpen, setCopilotOpen] = useState(false)
+  const [prompt, setPrompt] = useState('Quero um fluxo de lead: capturar nome/email, enviar ao CRM e checar retorno.')
 
   const initialRF = useMemo(() => toReactFlow(definition), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(initialRF.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialRF.edges)
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadFlow() {
@@ -121,6 +132,12 @@ export default function FlowBuilderPage() {
 
   function selectNode(id: string) {
     setSelectedNodeId(id)
+    setSelectedEdgeId(null)
+  }
+
+  function selectEdge(id: string) {
+    setSelectedEdgeId(id)
+    setSelectedNodeId(null)
   }
 
   function updateSelectedConfig(patch: Record<string, any>) {
@@ -134,9 +151,30 @@ export default function FlowBuilderPage() {
     )
   }
 
+  function updateEdgeLabel(newLabel: string) {
+    if (!selectedEdgeId) return
+    setEdges(es => es.map(e => e.id === selectedEdgeId ? { ...e, label: newLabel || undefined } : e))
+  }
+
+  function validate(def: FlowDefinition) {
+    const errs: Record<string, string[]> = {}
+    for (const n of def.nodes) {
+      const schema = serviceSchemas[n.type]
+      if (!schema) continue
+      const res = schema.safeParse(n.config ?? {})
+      if (!res.success) {
+        errs[n.id] = res.error.issues.map((i: any) => `${i.path.join('.') || n.type}: ${i.message}`)
+      }
+    }
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   async function save() {
     const def = fromReactFlow(nodes, edges, definition)
     setDefinition(def)
+    const ok = validate(def)
+    if (!ok) { alert('Há erros de configuração nos nós. Confira o painel de erros.'); return }
     await fetch(`/api/spaces/${workspaceId}/flows/${flowId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -149,11 +187,39 @@ export default function FlowBuilderPage() {
     if (!flowId) return
     const res = await fetch(`/api/spaces/${workspaceId}/execute/${flowId}`, { method: 'POST' })
     const data = await res.json()
-    console.log('RUN RESULT', data)
-    alert(data?.ok ? 'Execução iniciada com sucesso (veja logs no banco)' : `Erro: ${data?.error}`)
+    if (data?.waiting?.publicUrl) {
+      alert(`Execução pausada. Abra: ${data.waiting.publicUrl}`)
+    } else {
+      alert(data?.ok === false ? `Erro: ${data?.error}` : 'Execução finalizada (ver logs)')
+    }
+  }
+
+  async function importFromCopilot() {
+    const r = await fetch('/api/copilot', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    })
+    const d = await r.json()
+    const flow = (d?.flow ?? { start: 'n1', nodes: [] }) as FlowDefinition
+    const edgesConv: FlowEdge[] = []
+    for (const n of (flow.nodes ?? [])) {
+      if ((n as any).config?.rules?.length) {
+        for (const r of (n as any).config.rules) {
+          if (r?.route && r?.next) edgesConv.push({ from: n.id, to: r.next, via: r.route })
+        }
+      }
+      if ((n as any).next) edgesConv.push({ from: n.id, to: (n as any).next, via: 'default' })
+    }
+    const normalized: FlowDefinition = { start: (flow as any).start, nodes: flow.nodes, edges: edgesConv }
+    setDefinition(normalized)
+    const rf = toReactFlow(normalized)
+    setNodes(rf.nodes); setEdges(rf.edges)
+    setCopilotOpen(false)
   }
 
   const selected = nodes.find(n => n.id === selectedNodeId)
+  const selectedEdge = edges.find(e => e.id === selectedEdgeId)
+  const nodeErrors = selected ? (errors[selected.id] ?? []) : []
 
   return (
     <ReactFlowProvider>
@@ -176,6 +242,21 @@ export default function FlowBuilderPage() {
           <div className="space-y-2 pt-4">
             <button onClick={save} className="w-full bg-black text-white rounded px-3 py-2">Salvar</button>
             <button onClick={run} className="w-full bg-gray-900 text-white rounded px-3 py-2">Executar</button>
+            <a href={`/space/${workspaceId}/executions`} className="w-full block text-center border rounded px-3 py-2">Execuções</a>
+            <button onClick={() => setCopilotOpen(true)} className="w-full border rounded px-3 py-2">Importar do Copilot</button>
+          </div>
+
+          <div className="pt-4">
+            <div className="text-sm font-semibold">Erros</div>
+            {Object.keys(errors).length === 0 && <div className="text-xs text-gray-500">Nenhum erro</div>}
+            {Object.entries(errors).map(([id, list]) => (
+              <div key={id} className="mt-2">
+                <div className="text-xs font-semibold">Nó {id}</div>
+                <ul className="list-disc pl-5 text-xs text-red-600">
+                  {list.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </div>
+            ))}
           </div>
         </aside>
 
@@ -188,6 +269,7 @@ export default function FlowBuilderPage() {
             onConnect={onConnect}
             fitView
             onNodeClick={(_, n) => selectNode(n.id)}
+            onEdgeClick={(_, e) => selectEdge(e.id)}
           >
             <Background />
             <MiniMap />
@@ -197,7 +279,7 @@ export default function FlowBuilderPage() {
 
         <section className="col-span-3 border rounded p-3 space-y-3">
           <div className="text-sm font-semibold">Inspector</div>
-          {!selected && <div className="text-sm text-gray-500">Selecione um node no canvas</div>}
+          {!selected && !selectedEdge && <div className="text-sm text-gray-500">Selecione um nó ou uma aresta</div>}
           {selected && (
             <>
               <div className="space-y-2">
@@ -221,10 +303,10 @@ export default function FlowBuilderPage() {
 
               {selected.data?._raw?.type === 'decision' && (
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-600">Regras: path, op, value → next</p>
+                  <p className="text-xs text-gray-600">Regras: defina <code>route</code> para casar com o rótulo da aresta.</p>
                   <button className="border rounded px-2 py-1" onClick={() => {
                     const rules = selected.data?._raw?.config?.rules ?? []
-                    updateSelectedConfig({ rules: [...rules, { when: { path: 'status', op: 'eq', value: 200 }, next: '' }] })
+                    updateSelectedConfig({ rules: [...rules, { when: { path: 'status', op: 'eq', value: 200 }, route: 'approved' }] })
                   }}>+ Adicionar Regra</button>
                   {(selected.data?._raw?.config?.rules ?? []).map((r: any, idx: number) => (
                     <div key={idx} className="grid grid-cols-4 gap-2 items-center text-xs">
@@ -245,15 +327,20 @@ export default function FlowBuilderPage() {
                         rules[idx] = { ...r, when: { ...(r.when ?? {}), value: e.target.value } }
                         updateSelectedConfig({ rules })
                       }} />
-                      <input className="col-span-4 border rounded px-2 py-1" placeholder="next node id" defaultValue={r.next ?? ''} onBlur={e => {
+                      <input className="col-span-2 border rounded px-2 py-1" placeholder="route (ex.: approved)" defaultValue={r.route ?? ''} onBlur={e => {
+                        const rules = [...(selected.data?._raw?.config?.rules ?? [])]
+                        rules[idx] = { ...r, route: e.target.value }
+                        updateSelectedConfig({ rules })
+                      }} />
+                      <input className="col-span-2 border rounded px-2 py-1" placeholder="next node id (legado)" defaultValue={r.next ?? ''} onBlur={e => {
                         const rules = [...(selected.data?._raw?.config?.rules ?? [])]
                         rules[idx] = { ...r, next: e.target.value }
                         updateSelectedConfig({ rules })
                       }} />
                     </div>
                   ))}
-                  <label className="text-sm font-medium">Default next</label>
-                  <input className="w-full border rounded px-2 py-1" placeholder="node-id" defaultValue={selected.data?._raw?.config?.defaultNext ?? ''} onBlur={e => updateSelectedConfig({ defaultNext: e.target.value })} />
+                  <label className="text-sm font-medium">Default route</label>
+                  <input className="w-full border rounded px-2 py-1" placeholder="default" defaultValue={selected.data?._raw?.config?.defaultRoute ?? 'default'} onBlur={e => updateSelectedConfig({ defaultRoute: e.target.value })} />
                 </div>
               )}
 
@@ -266,10 +353,40 @@ export default function FlowBuilderPage() {
                   }} />
                 </div>
               )}
+              {nodeErrors.length > 0 && (
+                <div className="rounded border border-red-300 bg-red-50 p-2">
+                  <div className="text-xs font-semibold text-red-700">Erros neste nó</div>
+                  <ul className="list-disc pl-5 text-xs text-red-700">
+                    {nodeErrors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                </div>
+              )}
             </>
+          )}
+
+          {selectedEdge && (
+            <div className="space-y-2">
+              <div className="text-sm">Aresta: <code>{selectedEdge.source} → {selectedEdge.target}</code></div>
+              <label className="text-sm font-medium">Rota (via)</label>
+              <input className="w-full border rounded px-2 py-1" defaultValue={selectedEdge.label as string || ''} onBlur={e => updateEdgeLabel(e.target.value.trim() || 'default')} />
+              <p className="text-xs text-gray-600">Ex.: <code>approved</code>, <code>denied</code>, <code>default</code></p>
+            </div>
           )}
         </section>
       </div>
+
+      {copilotOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white rounded p-4 w-full max-w-xl space-y-3">
+            <h2 className="text-lg font-semibold">Importar do Copilot</h2>
+            <textarea className="w-full border rounded p-2 h-32" value={prompt} onChange={e => setPrompt(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <button className="border rounded px-3 py-2" onClick={() => setCopilotOpen(false)}>Cancelar</button>
+              <button className="bg-black text-white rounded px-3 py-2" onClick={importFromCopilot}>Importar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </ReactFlowProvider>
   )
 }

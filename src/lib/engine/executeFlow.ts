@@ -1,17 +1,43 @@
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@prisma/client'
-import { FlowDefinition, FlowNode, RunContext } from '@/lib/services/types'
+import { FlowDefinition, FlowEdge, FlowNode, RunContext } from '@/lib/services/types'
 import { services } from '@/lib/services'
 import crypto from 'node:crypto'
+
+function outsFor(nodeId: string, edges?: FlowEdge[]) {
+  return (edges ?? []).filter(e => e.from === nodeId)
+}
+
+function resolveNextNode({
+  node,
+  edges,
+  route,
+  fallbackNext,
+}: {
+  node: FlowNode
+  edges?: FlowEdge[]
+  route?: string | null
+  fallbackNext?: string | null
+}): string | null {
+  const outs = outsFor(node.id, edges)
+  if (outs.length) {
+    if (route) {
+      const m = outs.find(e => (e.via ?? 'default') === route)
+      if (m) return m.to
+    }
+    const d = outs.find(e => !e.via || e.via === 'default')
+    if (d) return d.to
+    return outs[0]?.to ?? null
+  }
+  return fallbackNext ?? node.next ?? null
+}
 
 export async function executeFlow(flowId: string, input?: unknown) {
   const flow = await prisma.flow.findUnique({ where: { id: flowId } })
   if (!flow) throw new Error('Flow não encontrado')
 
   const definition = flow.definition as unknown as FlowDefinition
-  const nodeMap = new Map<string, FlowNode>(
-    (definition.nodes ?? []).map(n => [n.id, n]),
-  )
+  const nodeMap = new Map<string, FlowNode>((definition.nodes ?? []).map(n => [n.id, n]))
 
   const execution = await prisma.flowExecution.create({
     data: { flowId, status: 'RUNNING', input: input ?? {} },
@@ -40,7 +66,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
         throw new Error(`Serviço '${node.type}' não registrado`)
       }
 
-      const { output, next, wait } = await service.onRun({
+      const { output, route, next, wait } = await service.onRun({
         node,
         input: lastOutput,
         context: ctx,
@@ -48,7 +74,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
 
       if (wait?.kind === 'form') {
         const token = crypto.randomUUID()
-        const resumeNext = wait.resumeNext ?? node.next ?? null
+        const resumeNext = wait.resumeNext ?? resolveNextNode({ node, edges: definition.edges, route, fallbackNext: next ?? node.next ?? null })
         const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/public/${token}`
 
         await prisma.waitToken.create({
@@ -81,7 +107,7 @@ export async function executeFlow(flowId: string, input?: unknown) {
         lastOutput = output
       }
 
-      currentId = (next ?? node.next) ?? null
+      currentId = resolveNextNode({ node, edges: definition.edges, route, fallbackNext: next ?? node.next ?? null })
     }
 
     await prisma.flowExecution.update({

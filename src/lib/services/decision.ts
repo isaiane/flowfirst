@@ -2,12 +2,15 @@ import { FlowNode, FlowService } from './types'
 
 type Rule = {
 	 when: { path: string; op: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte'; value: any }
-	 next: string
+	 // novo: rota nomeada (preferencial)
+	 route?: string
+	 // legado: próximo direto
+	 next?: string
 }
 
 type DecisionConfig = {
 	 rules: Rule[]
-	 defaultNext?: string | null
+	 defaultRoute?: string | null
 	 source?: 'lastOutput' | 'bag'
 	 bagKey?: string
 }
@@ -32,10 +35,13 @@ export const DecisionService: FlowService = {
 	 key: 'decision',
 	 label: 'Decision',
   meta: {
-    description: 'Avaliador condicional com regras simples que define o próximo nó.',
+    description: 'Avaliador condicional com rotas nomeadas (ex.: approved/denied).',
     inputs: ['Objeto de contexto (input/última saída ou bag)'],
     outputs: ['{ matched: Rule | null }'],
-    example: { rules: [{ when: { path: 'status', op: 'eq', value: 200 }, next: 'node-2' }], defaultNext: null },
+    example: { rules: [
+      { when: { path: 'status', op: 'eq', value: 200 }, route: 'approved' },
+      { when: { path: 'status', op: 'eq', value: 400 }, route: 'denied' },
+    ], defaultRoute: 'default' },
   },
 
 	 async onRun({ node, input, context }) {
@@ -50,10 +56,12 @@ export const DecisionService: FlowService = {
 		 for (const r of rules) {
 			 const left = getByPath(sourceObj, r.when.path)
 			 if (compare(r.when.op, left, r.when.value)) {
-				 return { output: { matched: r }, next: r.next }
+				 if (r.route) return { output: { matched: r }, route: r.route }
+				 if (r.next) return { output: { matched: r }, next: r.next }
+				 return { output: { matched: r } }
 			 }
 		 }
 
-		 return { output: { matched: null }, next: cfg.defaultNext ?? null }
+		 return { output: { matched: null }, route: cfg.defaultRoute ?? 'default' }
 	 },
 }
