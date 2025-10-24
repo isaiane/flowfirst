@@ -7,7 +7,16 @@ export default function ExecutionDetail() {
   const [data, setData] = useState<any>(null)
 
   useEffect(() => {
-    fetch(`/api/spaces/${workspaceId}/executions/${id}`).then(r => r.json()).then(setData)
+    (async () => {
+      try {
+        const r = await fetch(`/api/spaces/${workspaceId}/executions/${id}`)
+        const text = await r.text()
+        const parsed = text ? JSON.parse(text) : { error: `HTTP ${r.status}` }
+        setData(parsed)
+      } catch (e: any) {
+        setData({ error: e?.message ?? String(e) })
+      }
+    })()
   }, [workspaceId, id])
 
   if (!data) return <main className="p-6">Carregando…</main>
