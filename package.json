@@ -14,7 +14,8 @@
     "e2e:demo": "tsx scripts/e2e-demo.ts",
     "e2e:branch2": "tsx scripts/e2e-branch-two-forms.ts",
     "cli:add-service": "tsx scripts/add-service.ts",
-    "e2e:workspace": "tsx scripts/e2e-workspace-flow.ts"
+    "e2e:workspace": "tsx scripts/e2e-workspace-flow.ts",
+    "e2e:public": "tsx scripts/e2e-public-form.ts"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1",

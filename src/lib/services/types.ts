@@ -18,6 +18,12 @@ export type FlowDefinition = {
   nodes: FlowNode[]
 }
 
+export type WaitSignal = {
+  kind: 'form'
+  payload: any
+  resumeNext?: string | null
+}
+
 export interface FlowService {
   key: string
   label: string
@@ -36,7 +42,7 @@ export interface FlowService {
     node: FlowNode
     input: unknown
     context: RunContext
-  }): Promise<{ output: unknown; next?: string | null }>
+  }): Promise<{ output?: unknown; next?: string | null; wait?: WaitSignal }>
 }
 
 export type ServiceRegistry = Record<string, FlowService>

@@ -114,6 +114,7 @@ model FlowExecution {
   finishedAt  DateTime?  @map("finished_at")
 
   logs        FlowLog[]
+  waitTokens  WaitToken[]
 
   @@map("flow_executions")
 }
@@ -133,6 +134,7 @@ model FlowLog {
 enum ExecStatus {
   PENDING
   RUNNING
+  WAITING
   SUCCESS
   FAILED
 }
@@ -141,4 +143,17 @@ enum LogLevel {
   INFO
   WARN
   ERROR
+}
+
+model WaitToken {
+  id          String        @id @default(cuid())
+  token       String        @unique
+  executionId String
+  execution   FlowExecution @relation(fields: [executionId], references: [id])
+  nodeId      String
+  resumeNext  String?
+  fields      Json
+  contextBag  Json
+  consumedAt  DateTime?
+  createdAt   DateTime      @default(now())
 }

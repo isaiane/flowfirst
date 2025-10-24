@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import type { Prisma } from '@prisma/client'
 import { FlowDefinition, FlowNode, RunContext } from '@/lib/services/types'
 import { services } from '@/lib/services'
+import crypto from 'node:crypto'
 
 export async function executeFlow(flowId: string, input?: unknown) {
   const flow = await prisma.flow.findUnique({ where: { id: flowId } })
@@ -39,14 +40,46 @@ export async function executeFlow(flowId: string, input?: unknown) {
         throw new Error(`Serviço '${node.type}' não registrado`)
       }
 
-      const { output, next } = await service.onRun({
+      const { output, next, wait } = await service.onRun({
         node,
         input: lastOutput,
         context: ctx,
       })
 
-      ctx.bag[node.id] = output
-      lastOutput = output
+      if (wait?.kind === 'form') {
+        const token = crypto.randomUUID()
+        const resumeNext = wait.resumeNext ?? node.next ?? null
+        const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/public/${token}`
+
+        await prisma.waitToken.create({
+          data: {
+            token,
+            executionId: execution.id,
+            nodeId: node.id,
+            resumeNext,
+            fields: (wait.payload ?? {}) as Prisma.InputJsonValue,
+            contextBag: ctx.bag as unknown as Prisma.InputJsonValue,
+          },
+        })
+
+        await prisma.flowExecution.update({
+          where: { id: execution.id },
+          data: { status: 'WAITING' },
+        })
+
+        await log(execution.id, 'INFO', 'Execução pausada. Aguardando input do formulário.', {
+          token,
+          publicUrl,
+          resumeNext,
+        })
+
+        return { executionId: execution.id, waiting: { token, publicUrl, resumeNext } }
+      }
+
+      if (typeof output !== 'undefined') {
+        ctx.bag[node.id] = output
+        lastOutput = output
+      }
 
       currentId = (next ?? node.next) ?? null
     }

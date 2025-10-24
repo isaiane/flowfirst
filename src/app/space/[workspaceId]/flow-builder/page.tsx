@@ -209,6 +209,9 @@ export default function FlowBuilderPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">URL</label>
                   <input className="w-full border rounded px-2 py-1" defaultValue={selected.data?._raw?.config?.url ?? ''} onBlur={e => updateSelectedConfig({ url: e.target.value })} />
+                  {!selected.data?._raw?.config?.url && (
+                    <p className="text-xs text-amber-600">Informe uma URL (ex.: https://httpbin.org/post).</p>
+                  )}
                   <label className="text-sm font-medium">Method</label>
                   <select className="w-full border rounded px-2 py-1" defaultValue={selected.data?._raw?.config?.method ?? 'POST'} onChange={e => updateSelectedConfig({ method: e.target.value })}>
                     <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option>

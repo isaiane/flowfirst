@@ -4,13 +4,20 @@ export const FormService: FlowService = {
 	 key: 'form',
 	 label: 'Form',
   meta: {
-    description: '(Stub) Propaga configuração de formulário; captura real na Fase 4.',
+    description: 'Coleta dados via página pública e retoma a execução.',
     inputs: ['Qualquer JSON'],
-    outputs: ['{ formConfig, input }'],
-    example: { fields: ['nome', 'email', 'telefone'] },
+    outputs: ['{ form: "waiting" } ou dados do usuário na retomada'],
+    example: { title: 'Contato', fields: ['nome', 'email'] },
   },
 
-	 async onRun({ node, input }) {
-		 return { output: { formConfig: node.config ?? {}, input } }
+  async onRun({ node }) {
+    const cfg = (node.config ?? {}) as any
+    const payload = {
+      title: cfg.title ?? 'Formulário',
+      description: cfg.description ?? 'Preencha os dados abaixo.',
+      fields: Array.isArray(cfg.fields) ? cfg.fields : [],
+    }
+
+    return { wait: { kind: 'form', payload, resumeNext: node.next ?? null } }
 	 },
 }
