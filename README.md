@@ -1,109 +1,107 @@
-# FlowFirst — PoC (Fases 1–3)
+# FlowFirst — Fase 4 (Form público + Copilot v0)
 
-## Setup (Fase 1)
-1. Crie um Postgres (Neon/Render/etc) e defina `DATABASE_URL` em `.env.local`.
-2. `npm i`
-3. `npx prisma migrate dev -n init`
-4. `npm run dev`
-
-## Rotas úteis
-- `POST /api/flows` → `{ "kind": "demo" }` cria fluxo demo.
-- `POST /api/execute/:flowId` → executa e retorna `executionId`, `result`, `bag`.
-
-## Teste rápido
-1. Abra `/`.
-2. Clique **Criar fluxo demo**.
-3. Clique **Executar** (usa `webhook` → `httpbin.org/post`).
+## Requisitos e Setup
+1. Banco Postgres acessível e `DATABASE_URL` definido em `.env.local`.
+2. Instalar deps e gerar client:
+   - `npm i`
+   - `npx prisma generate`
+3. Aplicar migrações (inclui Auth/Workspaces e WaitToken):
+   - `npx prisma migrate dev -n init` (se for primeira vez)
+   - `npx prisma migrate dev -n auth_workspaces`
+   - `npx prisma migrate dev -n form_wait_tokens`
+4. Subir o dev server:
+   - `npm run dev`
 
 ## Variáveis de ambiente
-Crie um arquivo `.env.local` na raiz com:
-
+Crie/ajuste `.env.local` com:
 ```
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public"
-```
-
-## Deploy (Vercel)
-1. Suba o repositório no GitHub.
-2. Crie um projeto na Vercel e importe o repo.
-3. Adicione `DATABASE_URL` como variável de ambiente (Production/Preview).
-4. Rode `npx prisma migrate deploy` no primeiro deploy (Command ou script). Alternativamente, faça um deploy local das migrações e confirme que o banco está pronto.
-
----
-
-# Fase 2 — Flow Builder (ReactFlow)
-
-## Novas dependências
-`npm i reactflow zustand`
-
-## Builder
-- Página: `/flow-builder` (na Fase 3 passa para `/space/[workspaceId]/flow-builder`)
-- Sidebar com nodes: Webhook, Decision, Form
-- Inspector para editar config do node selecionado
-- Salvar → `PUT /api/flows/:id` (grava `definition` no Postgres)
-- Executar → `POST /api/execute/:flowId`
-
-### APIs adicionadas/atualizadas
-- `GET /api/flows/:id` → retorna `{ flow: { id, name, definition } }`
-- `PUT /api/flows/:id` body: `{ name, definition }`
-- `POST /api/flows` com `{ kind: "blank" }` para criar um fluxo vazio
-
-### Serviços
-- `webhook` (funcional)
-- `decision` (branching com regras simples; escolhe próximo node via retorno `next`)
-- `form` (stub, apenas propaga config nesta fase)
-
-## Testes
-- Unit (Vitest): `npm run test`
-- E2E demo: `npm run e2e:demo` (cria e executa fluxo webhook)
-- E2E decision (branch 2 forms): `npm run e2e:branch2` (requer dev server ativo)
-
----
-
-# Fase 3 — Auth + Workspaces + DX
-
-## Novas dependências
-`npm i next-auth @auth/prisma-adapter --legacy-peer-deps`
-
-## Variáveis de ambiente (Auth)
-```
-GITHUB_ID="xxxx"
-GITHUB_SECRET="xxxx"
-NEXTAUTH_SECRET="uma-string-aleatoria-bem-grande"
 NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="uma-string-aleatoria-bem-grande"
+
+# Login por e‑mail (SMTP)
+EMAIL_HOST=smtp.seu-provedor.com
+EMAIL_PORT=587
+EMAIL_USER=seu_user
+EMAIL_PASS=seu_pass
+EMAIL_FROM="SaaS Platform <no-reply@saas.com>"
+
+# URL pública (usada no link do formulário)
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Opcional (Copilot v0)
+OPENAI_API_KEY="sk-..."
 ```
 
-## Prisma (Auth + Workspaces)
-- Adicionados: `User`, `Account`, `Session`, `VerificationToken`, `Workspace`, `Membership`, `Role` e `Flow.workspaceId`.
-- Migração: `npx prisma migrate dev -n auth_workspaces`
+## Entregas desta fase
+- Execução com pausa e retomada (WAITING/WaitToken; engine wait/resume; FormService retorna `waiting.publicUrl`).
+- Formulário público (sem auth): API `GET/POST /api/public/[token]` + página `/public/[token]`.
+- Copilot v0: `POST /api/copilot` — JSON de fluxo (fallback sem chave; OpenAI se houver `OPENAI_API_KEY`).
+- Auth + Workspaces (Fase 3) já integrados nas rotas namespaced.
 
-## Auth e Guard
-- NextAuth: rota `GET/POST /api/auth/[...nextauth]`
-- Guard: `requireMembership(workspaceId)` para proteger rotas por workspace
-
-## APIs namespaced
-- Criar flow: `POST /api/spaces/[workspaceId]/flows` (kind: demo|blank)
-- Obter/Salvar flow: `GET/PUT /api/spaces/[workspaceId]/flows/[id]`
-- Executar flow: `POST /api/spaces/[workspaceId]/execute/[flowId]`
+## Rotas principais
+- Namespaced por workspace (auth + membership):
+  - `POST /api/spaces/[workspaceId]/flows` (kind: `blank|demo`)
+  - `GET/PUT /api/spaces/[workspaceId]/flows/[id]`
+  - `POST /api/spaces/[workspaceId]/execute/[flowId]`
+- Público (sem auth):
+  - `GET /api/public/[token]` → metadados do formulário
+  - `POST /api/public/[token]` → submete e retoma execução
+- Copilot v0:
+  - `POST /api/copilot` → `{ flow: { start, nodes: [...] }, note? }`
 
 ## Páginas
-- `/signin`: botão “Entrar com GitHub”
-- `/workspaces`: listar e criar workspace (redireciona para builder)
-- `/space/[workspaceId]/flow-builder`: builder sob o workspace
-- `/services`: catálogo dos serviços (meta de inputs/outputs/exemplo)
+- `/signin` — Entrar (GitHub/Email)
+- `/workspaces` — listar/criar workspaces
+- `/space/[workspaceId]/flows` — listar/criar flows do workspace e abrir no Builder
+- `/space/[workspaceId]/flow-builder?flowId=...` — builder do flow
+- `/public/[token]` — formulário público (render pelo token)
+- `/services` — catálogo dos serviços (meta)
 
-## CLI (DX)
-- Criar serviço: `npm run cli:add-service hello`
-  - Gera `src/lib/services/hello.ts` e registra no `src/lib/services/index.ts`
+## Como testar no navegador (passo a passo)
+1. Faça login em `/signin` (GitHub/email) e vá para `/workspaces`.
+2. Crie um workspace → redireciona para `/space/[id]/flows`.
+3. Crie um Flow (ou Demo) e abra no Builder.
+4. Monte o fluxo: Form → Webhook.
+   - Selecione o node Form e configure `title/description/fields`.
+   - Conecte `Form.next` ao `Webhook`.
+   - Selecione o node Webhook e defina `url` (ex.: `https://httpbin.org/post`) e método.
+   - Clique Salvar.
+5. Clique Executar.
+   - A resposta (DevTools → Network) deve conter `waiting.publicUrl`.
+6. Abra `waiting.publicUrl` em aba anônima e envie o formulário.
+   - A execução deve retomar e finalizar com SUCCESS.
+7. Valide no banco (`npx prisma studio`):
+   - `FlowExecution.status`: WAITING → SUCCESS
+   - `FlowLog`: pausa e retomada
+   - `WaitToken.consumedAt`: preenchido
 
-## Testes E2E Fase 3
-- Workspace + flow (bypass de auth):
-  - `E2E_BYPASS=1 E2E_BASE_URL=http://localhost:3000 npm run e2e:workspace`
-- Branching 2 forms: `E2E_BASE_URL=http://localhost:3000 npm run e2e:branch2`
+## Copilot v0 (rápido)
+Via console do navegador:
+```
+fetch('/api/copilot',{
+  method:'POST',headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({ prompt:'capturar lead e enviar ao CRM' })
+}).then(r=>r.json()).then(console.log)
+```
+Resultado: JSON `{ flow: { start, nodes: [...] } }` (fallback se sem `OPENAI_API_KEY`).
 
-## Critérios de aceitação (F3)
-- Login (GitHub) funcionando e sessão persistente
-- Workspaces: criação/listagem; acesso ao builder por membro
-- APIs namespaced validam membership (401/403 quando não)
-- Builder salva/roda fluxos sob workspace correto
-- Catálogo de serviços em `/services`
-- CLI `cli:add-service <Nome>` cria arquivo e registra no registry
+## Testes E2E (opcionais)
+- Workspace/execução (com bypass):
+```
+E2E_BYPASS=1 E2E_BASE_URL=http://localhost:3000 npm run e2e:workspace
+```
+- Branching com 2 forms:
+```
+E2E_BASE_URL=http://localhost:3000 npm run e2e:branch2
+```
+- Formulário público com retomada:
+```
+E2E_BYPASS=1 E2E_BASE_URL=http://localhost:3000 npm run e2e:public
+```
+
+## Notas
+- Conceitos: **Workspace** (área de trabalho do time/empresa) → agrupa **Flows** (jornadas) → Builder opera por `flowId`.
+- Em dev pode usar Mailhog/Mailpit para o login por e‑mail (ajuste `EMAIL_HOST/PORT`).
+
+ 
