@@ -157,3 +157,54 @@ model WaitToken {
   consumedAt  DateTime?
   createdAt   DateTime      @default(now())
 }
+
+// --- Fase 6: Confiabilidade & Observabilidade ---
+
+model ServiceHealth {
+  id          String       @id @default(cuid())
+  workspaceId String       @map("workspace_id")
+  nodeId      String       @map("node_id")
+  serviceKey  String       @map("service_key")
+  state       CircuitState @default(CLOSED)
+  failures    Int          @default(0)
+  lastFailure DateTime?    @map("last_failure")
+  openedAt    DateTime?    @map("opened_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, nodeId])
+  @@map("service_health")
+}
+
+enum CircuitState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+model ServiceStat {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  nodeId      String   @map("node_id")
+  serviceKey  String   @map("service_key")
+  executions  Int      @default(0)
+  successes   Int      @default(0)
+  failures    Int      @default(0)
+  p50Ms       Int      @default(0) @map("p50_ms")
+  p95Ms       Int      @default(0) @map("p95_ms")
+  lastMs      Int      @default(0) @map("last_ms")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, nodeId])
+  @@map("service_stats")
+}
+
+model EventWebhook {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  url         String
+  secret      String
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("event_webhooks")
+}

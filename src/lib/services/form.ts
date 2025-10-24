@@ -8,6 +8,8 @@ export const FormService: FlowService = {
     inputs: ['Qualquer JSON'],
     outputs: ['{ form: "waiting" } ou dados do usuário na retomada'],
     example: { title: 'Contato', fields: ['nome', 'email'] },
+    namedRoutes: ['default'],
+    defaults: { timeoutMs: 0, retry: { maxAttempts: 1 } },
   },
 
   async onRun({ node }) {

@@ -8,6 +8,8 @@ export const WebhookService: FlowService = {
     inputs: ['Qualquer JSON (opcional)'],
     outputs: ['{ status: number, data: any }'],
     example: { url: 'https://httpbin.org/post', method: 'POST', body: { foo: 'bar' } },
+    namedRoutes: ['default'],
+    defaults: { timeoutMs: 8000, retry: { maxAttempts: 2, baseMs: 300, maxMs: 5000 } },
   },
 
   async onCreate({ node }) {
@@ -44,7 +46,7 @@ export const WebhookService: FlowService = {
       json = { text }
     }
 
-    return { output: { status: res.status, data: json } }
+    return { output: { status: res.status, data: json }, route: 'default' }
   },
 }
 

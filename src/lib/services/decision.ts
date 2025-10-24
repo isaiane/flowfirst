@@ -42,6 +42,8 @@ export const DecisionService: FlowService = {
       { when: { path: 'status', op: 'eq', value: 200 }, route: 'approved' },
       { when: { path: 'status', op: 'eq', value: 400 }, route: 'denied' },
     ], defaultRoute: 'default' },
+    namedRoutes: ['approved','denied','default'],
+    defaults: { timeoutMs: 2000, retry: { maxAttempts: 1 } },
   },
 
 	 async onRun({ node, input, context }) {

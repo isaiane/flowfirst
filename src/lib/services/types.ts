@@ -39,6 +39,12 @@ export interface FlowService {
     inputs?: string[]
     outputs?: string[]
     example?: any
+    namedRoutes?: string[]
+    defaults?: {
+      timeoutMs?: number
+      retry?: { maxAttempts?: number; baseMs?: number; maxMs?: number }
+      circuit?: { failureThreshold?: number; cooldownMs?: number; halfOpenMax?: number }
+    }
   }
 
   onCreate?(args: { flowId: string; node: FlowNode }): Promise<void> | void

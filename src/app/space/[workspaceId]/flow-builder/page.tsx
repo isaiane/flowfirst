@@ -220,6 +220,21 @@ export default function FlowBuilderPage() {
   const selected = nodes.find(n => n.id === selectedNodeId)
   const selectedEdge = edges.find(e => e.id === selectedEdgeId)
   const nodeErrors = selected ? (errors[selected.id] ?? []) : []
+  const sourceNode = selectedEdge ? nodes.find(n => n.id === selectedEdge.source) : null
+  const sourceService = sourceNode ? (sourceNode.data as any)?._raw?.type : null
+  const [routes, setRoutes] = useState<string[]>([])
+
+  useEffect(() => {
+    (async () => {
+      if (!sourceService) { setRoutes([]); return }
+      try {
+        const r = await fetch('/api/services')
+        const d = await r.json()
+        const item = (d?.services ?? []).find((s: any) => s.key === sourceService)
+        setRoutes(item?.meta?.namedRoutes ?? [])
+      } catch { setRoutes([]) }
+    })()
+  }, [sourceService])
 
   return (
     <ReactFlowProvider>
@@ -368,7 +383,14 @@ export default function FlowBuilderPage() {
             <div className="space-y-2">
               <div className="text-sm">Aresta: <code>{selectedEdge.source} → {selectedEdge.target}</code></div>
               <label className="text-sm font-medium">Rota (via)</label>
-              <input className="w-full border rounded px-2 py-1" defaultValue={selectedEdge.label as string || ''} onBlur={e => updateEdgeLabel(e.target.value.trim() || 'default')} />
+              {routes.length > 0 ? (
+                <select className="w-full border rounded px-2 py-1" defaultValue={(selectedEdge.label as string) || ''} onChange={e => updateEdgeLabel(e.target.value)}>
+                  <option value="">(vazio)</option>
+                  {routes.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              ) : (
+                <input className="w-full border rounded px-2 py-1" defaultValue={selectedEdge.label as string || ''} onBlur={e => updateEdgeLabel(e.target.value.trim() || 'default')} />
+              )}
               <p className="text-xs text-gray-600">Ex.: <code>approved</code>, <code>denied</code>, <code>default</code></p>
             </div>
           )}
